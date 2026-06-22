@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"moving-schedule-backend/config"
-	"moving-schedule-backend/models"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
