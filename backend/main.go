@@ -46,6 +46,7 @@ func main() {
 		{
 			workers.GET("", handlers.GetWorkers)
 			workers.POST("", handlers.CreateWorker)
+			workers.GET("/:id/dispatches", handlers.GetWorkerDispatchesByID)
 		}
 
 		vehicles := api.Group("/vehicles")
@@ -60,6 +61,9 @@ func main() {
 			dispatches.GET("/check", handlers.CheckDispatch)
 			dispatches.GET("", handlers.GetDispatches)
 			dispatches.GET("/:id", handlers.GetDispatch)
+			dispatches.PUT("/:id/accept", handlers.AcceptDispatch)
+			dispatches.PUT("/:id/start", handlers.StartDispatch)
+			dispatches.PUT("/:id/complete", handlers.CompleteDispatch)
 		}
 
 		worker := api.Group("/worker")

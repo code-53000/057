@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
-
-	"gorm.io/gorm"
 )
 
 type OrderStatus string
@@ -34,10 +32,9 @@ type Order struct {
 	ItemsDescription    string         `gorm:"column:items_description;type:text" json:"items_description"`
 	EstimatedWorkers    int            `gorm:"column:estimated_workers;not null;default:2" json:"estimated_workers"`
 	EstimatedVehicleType string        `gorm:"column:estimated_vehicle_type;type:varchar(20);not null" json:"estimated_vehicle_type"`
-	Status              OrderStatus    `gorm:"column:status;type:varchar(20);not null;default:pending" json:"status"`
-	CreatedAt           time.Time      `json:"created_at"`
-	UpdatedAt           time.Time      `json:"updated_at"`
-	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
+	Status              OrderStatus `gorm:"column:status;type:varchar(20);not null;default:pending" json:"status"`
+	CreatedAt           time.Time   `json:"created_at"`
+	UpdatedAt           time.Time   `json:"updated_at"`
 }
 
 func (Order) TableName() string {
@@ -55,9 +52,8 @@ type Worker struct {
 	ID        uint           `gorm:"primaryKey" json:"id"`
 	Name      string         `gorm:"column:name;type:varchar(50);not null" json:"name"`
 	Phone     string         `gorm:"column:phone;type:varchar(20);not null;unique" json:"phone"`
-	Status    WorkerStatus   `gorm:"column:status;type:varchar(20);not null;default:available" json:"status"`
-	CreatedAt time.Time      `json:"created_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Status    WorkerStatus `gorm:"column:status;type:varchar(20);not null;default:available" json:"status"`
+	CreatedAt time.Time    `json:"created_at"`
 }
 
 func (Worker) TableName() string {
@@ -77,9 +73,8 @@ type Vehicle struct {
 	VehicleType     string         `gorm:"column:vehicle_type;type:varchar(20);not null" json:"vehicle_type"`
 	CapacityVolume  float64        `gorm:"column:capacity_volume;type:float;not null;default:0" json:"capacity_volume"`
 	CapacityWeight  float64        `gorm:"column:capacity_weight;type:float;not null;default:0" json:"capacity_weight"`
-	Status          VehicleStatus  `gorm:"column:status;type:varchar(20);not null;default:available" json:"status"`
-	CreatedAt       time.Time      `json:"created_at"`
-	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
+	Status          VehicleStatus `gorm:"column:status;type:varchar(20);not null;default:available" json:"status"`
+	CreatedAt       time.Time     `json:"created_at"`
 }
 
 func (Vehicle) TableName() string {

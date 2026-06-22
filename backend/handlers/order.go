@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"moving-schedule-backend/database"
@@ -29,20 +30,70 @@ type CreateOrderRequest struct {
 }
 
 type UpdateOrderRequest struct {
-	CustomerName         string  `json:"customer_name"`
-	CustomerPhone        string  `json:"customer_phone"`
-	MoveDate             string  `json:"move_date"`
-	StartAddress         string  `json:"start_address"`
-	StartFloor           *int    `json:"start_floor"`
-	StartHasElevator     *bool   `json:"start_has_elevator"`
-	EndAddress           string  `json:"end_address"`
-	EndFloor             *int    `json:"end_floor"`
-	EndHasElevator       *bool   `json:"end_has_elevator"`
+	CustomerName         string   `json:"customer_name"`
+	CustomerPhone        string   `json:"customer_phone"`
+	MoveDate             string   `json:"move_date"`
+	StartAddress         string   `json:"start_address"`
+	StartFloor           *int     `json:"start_floor"`
+	StartHasElevator     *bool    `json:"start_has_elevator"`
+	EndAddress           string   `json:"end_address"`
+	EndFloor             *int     `json:"end_floor"`
+	EndHasElevator       *bool    `json:"end_has_elevator"`
 	ItemsVolume          *float64 `json:"items_volume"`
-	ItemsDescription     string  `json:"items_description"`
-	EstimatedWorkers     *int    `json:"estimated_workers"`
-	EstimatedVehicleType string  `json:"estimated_vehicle_type"`
-	Status               string  `json:"status"`
+	ItemsDescription     string   `json:"items_description"`
+	EstimatedWorkers     *int     `json:"estimated_workers"`
+	EstimatedVehicleType string   `json:"estimated_vehicle_type"`
+	Status               string   `json:"status"`
+}
+
+func parseDateFlexible(dateStr string) (time.Time, error) {
+	formats := []string{
+		"2006-01-02",
+		"2006-01-02 15:04:05",
+		time.RFC3339,
+		"2006/01/02",
+		"2006-01-02T15:04:05.000Z",
+		"2006-01-02T15:04:05Z",
+	}
+	for _, format := range formats {
+		t, err := time.ParseInLocation(format, dateStr, time.Local)
+		if err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, nil
+}
+
+func parseDateFromAny(v interface{}) (time.Time, error) {
+	var dateStr string
+	switch val := v.(type) {
+	case string:
+		dateStr = val
+	default:
+		return time.Time{}, nil
+	}
+
+	if dateStr == "" {
+		return time.Time{}, nil
+	}
+
+	formats := []string{
+		"2006-01-02",
+		"2006-01-02 15:04:05",
+		time.RFC3339,
+		"2006/01/02",
+		"2006-01-02T15:04:05.000Z",
+		"2006-01-02T15:04:05Z",
+		time.RFC3339Nano,
+	}
+	for _, format := range formats {
+		t, err := time.ParseInLocation(format, dateStr, time.Local)
+		if err == nil {
+			year, month, day := t.Date()
+			return time.Date(year, month, day, 0, 0, 0, 0, time.Local), nil
+		}
+	}
+	return time.Time{}, nil
 }
 
 func CreateOrder(c *gin.Context) {
@@ -52,8 +103,8 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	moveDate, err := time.Parse("2006-01-02", req.MoveDate)
-	if err != nil {
+	moveDate, err := parseDateFlexible(req.MoveDate)
+	if err != nil || moveDate.IsZero() {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "日期格式错误，应为 YYYY-MM-DD"})
 		return
 	}
@@ -96,6 +147,20 @@ func CreateOrder(c *gin.Context) {
 func GetOrders(c *gin.Context) {
 	status := c.Query("status")
 	date := c.Query("date")
+	moveDate := c.Query("move_date")
+
+	pageStr := c.DefaultQuery("page", "1")
+	sizeStr := c.DefaultQuery("size", "10")
+
+	page, _ := strconv.Atoi(pageStr)
+	size, _ := strconv.Atoi(sizeStr)
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 {
+		size = 10
+	}
+	offset := (page - 1) * size
 
 	query := database.DB.Model(&models.Order{})
 
@@ -105,15 +170,31 @@ func GetOrders(c *gin.Context) {
 
 	if date != "" {
 		query = query.Where("DATE(move_date) = ?", date)
+	} else if moveDate != "" {
+		query = query.Where("DATE(move_date) = ?", strings.Split(moveDate, "T")[0])
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询订单总数失败: " + err.Error()})
+		return
 	}
 
 	var orders []models.Order
-	if err := query.Order("move_date DESC, id DESC").Find(&orders).Error; err != nil {
+	if err := query.Order("move_date DESC, id DESC").
+		Limit(size).
+		Offset(offset).
+		Find(&orders).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询订单列表失败: " + err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, orders)
+	c.JSON(http.StatusOK, gin.H{
+		"list":  orders,
+		"total": total,
+		"page":  page,
+		"size":  size,
+	})
 }
 
 func GetOrder(c *gin.Context) {
@@ -158,8 +239,8 @@ func UpdateOrder(c *gin.Context) {
 		order.CustomerPhone = req.CustomerPhone
 	}
 	if req.MoveDate != "" {
-		moveDate, err := time.Parse("2006-01-02", req.MoveDate)
-		if err != nil {
+		moveDate, err := parseDateFlexible(req.MoveDate)
+		if err != nil || moveDate.IsZero() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "日期格式错误，应为 YYYY-MM-DD"})
 			return
 		}

@@ -20,6 +20,20 @@ type CompleteDispatchRequest struct {
 	Remark            string  `json:"remark"`
 }
 
+func GetWorkerDispatchesByID(c *gin.Context) {
+	workerIDStr := c.Param("id")
+	workerID, err := strconv.ParseUint(workerIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "worker_id 格式错误"})
+		return
+	}
+
+	dispatches := queryWorkerDispatches(uint(workerID))
+	c.JSON(http.StatusOK, gin.H{
+		"list": dispatches,
+	})
+}
+
 func GetWorkerDispatches(c *gin.Context) {
 	workerIDStr := c.Query("worker_id")
 	if workerIDStr == "" {
@@ -33,22 +47,25 @@ func GetWorkerDispatches(c *gin.Context) {
 		return
 	}
 
+	dispatches := queryWorkerDispatches(uint(workerID))
+	c.JSON(http.StatusOK, dispatches)
+}
+
+func queryWorkerDispatches(workerID uint) []models.Dispatch {
 	var allDispatches []models.Dispatch
 	if err := database.DB.Preload("Order").Preload("Vehicle").
 		Order("scheduled_start_time DESC, id DESC").
 		Find(&allDispatches).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询派单列表失败: " + err.Error()})
-		return
+		return []models.Dispatch{}
 	}
 
 	result := make([]models.Dispatch, 0)
 	for _, d := range allDispatches {
-		if containsWorkerID(d.WorkerIDs, uint(workerID)) {
+		if containsWorkerID(d.WorkerIDs, workerID) {
 			result = append(result, d)
 		}
 	}
-
-	c.JSON(http.StatusOK, result)
+	return result
 }
 
 func AcceptDispatch(c *gin.Context) {

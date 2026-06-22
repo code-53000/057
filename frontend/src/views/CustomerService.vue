@@ -228,18 +228,32 @@ const formatDate = (date) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+const formatDateSimple = (date) => {
+  if (!date) return ''
+  if (typeof date === 'string') {
+    if (date.includes('T')) {
+      return date.split('T')[0]
+    }
+    return date.substring(0, 10)
+  }
+  const d = new Date(date)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 const submitOrder = async () => {
   if (!orderFormRef.value) return
   await orderFormRef.value.validate(async (valid) => {
     if (valid) {
       submitting.value = true
       try {
-        await createOrder(orderForm)
+        const submitData = { ...orderForm }
+        submitData.move_date = formatDateSimple(orderForm.move_date)
+        await createOrder(submitData)
         ElMessage.success('订单创建成功')
         resetForm()
         loadOrders()
       } catch (e) {
-        ElMessage.error('订单创建失败')
+        ElMessage.error(e?.response?.data?.error || '订单创建失败')
       } finally {
         submitting.value = false
       }
@@ -274,7 +288,7 @@ const loadOrders = async () => {
       size: pageSize.value
     }
     if (filterStatus.value) params.status = filterStatus.value
-    if (filterDate.value) params.move_date = formatDate(filterDate.value)
+    if (filterDate.value) params.date = formatDateSimple(filterDate.value)
     const data = await getOrders(params)
     orderList.value = data.list || data.records || data || []
     total.value = data.total || orderList.value.length
